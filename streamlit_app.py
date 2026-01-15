@@ -211,9 +211,9 @@ def main():
             if debt_diff == 0:
                 st.success("神楽と枚方の債権は相殺されています。")
             elif debt_diff > 0:
-                st.warning(f"神楽は枚方に対して {debt_diff} 元の債権があります。")
+                st.warning(f"神楽は枚方に対して {debt_diff} 元の債務があります。")
             else:
-                st.warning(f"枚方は神楽に対して {-debt_diff} 元の債権があります。")
+                st.warning(f"枚方は神楽に対して {-debt_diff} 元の債務があります。")
 
     # Bill history
     st.subheader("履歴")
