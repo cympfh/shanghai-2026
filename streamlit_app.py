@@ -32,9 +32,13 @@ class Datetime:
 
     def show(self) -> str:
         """
-        Show in YYYY-MM-DD HH:MM format
+        Show `YYYY-MM-DD HH:MM` in Shanghai (UTC+8) timezone
         """
-        return self.raw_str.replace("T", " ")[:16]
+        import datetime
+
+        dt = datetime.datetime.fromisoformat(self.raw_str)
+        dt = dt + datetime.timedelta(hours=8)
+        return dt.strftime("%Y-%m-%d %H:%M")
 
 
 class MemoType(Enum):
