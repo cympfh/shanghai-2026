@@ -132,7 +132,7 @@ class MemoClient:
     def __iter__(self):
         """Remove canceled memos"""
         for i, memo, timestamp in self.data:
-            if not self.is_canceled(i):
+            if not self.is_canceled(i) and memo.memo_type != MemoType.Cancel:
                 yield i, memo, timestamp
 
 
@@ -158,7 +158,7 @@ def main():
             to_account = st.pills(
                 label="送金元", options=User.options(), selection_mode="multi"
             )
-            amount = st.number_input("金額 (元)", min_value=0, value=0)
+            amount = st.number_input("金額 (元)", min_value=0.0, value=0.0, step=0.5)
             if from_account:
                 if len(to_account) == 0:
                     st.info(f"{from_account} → ? : {amount} 元")
@@ -229,7 +229,7 @@ def main():
 
             debt_diff = debt[User.get(0)] - debt[User.get(1)]
             if debt_diff == 0:
-                st.success(f"{User.get(0)}と{User.get(1)}の債権は相殺されています。")
+                st.success(f"{User.get(0)}と{User.get(1)}の債務は相殺されています。")
             elif debt_diff > 0:
                 st.warning(
                     f"{User.get(0)}は{User.get(1)}に対して {debt_diff} 元の債務があります。"
@@ -241,25 +241,62 @@ def main():
 
     # Bill history
     st.subheader("履歴")
+
+    def build_payment_container(
+        i: int, memo: Memo, timestamp: Datetime, delete_button: bool
+    ):
+        with st.container(border=True):
+            st.markdown(
+                f":blue-badge[ID: {i}] :green-badge[:material/check: 支払] :gray-badge[:material/event_available: {timestamp.show()}]"
+            )
+            st.metric(
+                label=f"{memo.from_account} → {memo.to_account}",
+                value=f"{memo.amount} 元",
+            )
+            if memo.note:
+                st.info(f"Note: {memo.note}")
+            if delete_button:
+                if st.button(":material/delete: 削除", key=f"cancel_payment_{i}"):
+                    delete_dialog(i)
+
+    def build_memo_container(
+        i: int, memo: Memo, timestamp: Datetime, delete_button: bool
+    ):
+        with st.container(border=True):
+            st.markdown(
+                f":blue-badge[ID: {i}] :orange-badge[:material/note: Note] :gray-badge[:material/event_available: {timestamp.show()}]"
+            )
+            st.info(f"Note: {memo.note}")
+            if delete_button:
+                if st.button(":material/delete: 削除", key=f"cancel_note_{i}"):
+                    delete_dialog(i)
+
+    @st.dialog("削除の確認")
+    def delete_dialog(i: int):
+        st.markdown("以下の内容を削除してもよろしいですか？")
+        memo = memo_client.data[i][1]
+        timestamp = memo_client.data[i][2]
+        if memo.memo_type == MemoType.Payment:
+            build_payment_container(i, memo, timestamp, delete_button=False)
+        elif memo.memo_type == MemoType.Note:
+            build_memo_container(i, memo, timestamp, delete_button=False)
+        else:
+            st.warning("この項目は削除できません")
+        if st.button("OK"):
+            memo_client.post(
+                Memo(
+                    memo_type=MemoType.Cancel,
+                    cancel_id=i,
+                )
+            )
+            st.rerun()
+
     history = list(memo_client)
     for i, memo, timestamp in reversed(history):
         if memo.memo_type == MemoType.Payment:
-            with st.container(border=True):
-                st.markdown(
-                    f":blue-badge[ID: {i}] :green-badge[:material/check: 支払] :gray-badge[:material/event_available: {timestamp.show()}]"
-                )
-                st.metric(
-                    label=f"{memo.from_account} → {memo.to_account}",
-                    value=f"{memo.amount} 元",
-                )
-                if memo.note:
-                    st.info(f"Note: {memo.note}")
+            build_payment_container(i, memo, timestamp, delete_button=True)
         if memo.memo_type == MemoType.Note and memo.note:
-            with st.container(border=True):
-                st.markdown(
-                    f":blue-badge[ID: {i}] :orange-badge[:material/note: Note] :gray-badge[:material/event_available: {timestamp.show()}]"
-                )
-                st.info(f"Note: {memo.note}")
+            build_memo_container(i, memo, timestamp, delete_button=True)
 
     if len(history) == 0:
         st.info("履歴がありません")
