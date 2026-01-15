@@ -7,6 +7,25 @@ import requests
 import streamlit as st
 
 
+class User:
+    @staticmethod
+    def get(i: int) -> str:
+        assert 0 <= i <= 1
+        if i == 0:
+            return "神楽"
+        elif i == 1:
+            return "枚方"
+        raise
+
+    @staticmethod
+    def options() -> list[str]:
+        return [User.get(i) for i in range(2)]
+
+    @staticmethod
+    def len() -> int:
+        return 2
+
+
 class Datetime:
     def __init__(self, raw_str: str):
         self.raw_str = raw_str  # ISO 8601 format (UTC)
@@ -134,10 +153,10 @@ def main():
         )
         if ty == "支払":
             from_account = st.pills(
-                label="送金元", options=["神楽", "枚方"], selection_mode="single"
+                label="送金元", options=User.options(), selection_mode="single"
             )
             to_account = st.pills(
-                label="送金元", options=["神楽", "枚方"], selection_mode="multi"
+                label="送金元", options=User.options(), selection_mode="multi"
             )
             amount = st.number_input("金額 (元)", min_value=0, value=0)
             if from_account:
@@ -199,21 +218,26 @@ def main():
 
     if len(paytotal) > 0:
         with st.container(border=True):
-            cols = st.columns(len(paytotal))
-            for col, acc in zip(cols, paytotal.keys()):
-                with col:
+            cols = st.columns(User.len())
+            for i in range(User.len()):
+                with cols[i]:
+                    acc = User.get(i)
                     st.metric(
                         label=f"{acc} の支出",
                         value=f"{paytotal[acc]:.2f} 元",
                     )
 
-            debt_diff = debt["神楽"] - debt["枚方"]
+            debt_diff = debt[User.get(0)] - debt[User.get(1)]
             if debt_diff == 0:
-                st.success("神楽と枚方の債権は相殺されています。")
+                st.success(f"{User.get(0)}と{User.get(1)}の債権は相殺されています。")
             elif debt_diff > 0:
-                st.warning(f"神楽は枚方に対して {debt_diff} 元の債務があります。")
+                st.warning(
+                    f"{User.get(0)}は{User.get(1)}に対して {debt_diff} 元の債務があります。"
+                )
             else:
-                st.warning(f"枚方は神楽に対して {-debt_diff} 元の債務があります。")
+                st.warning(
+                    f"{User.get(1)}は{User.get(0)}に対して {-debt_diff} 元の債務があります。"
+                )
 
     # Bill history
     st.subheader("履歴")
