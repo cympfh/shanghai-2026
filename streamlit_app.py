@@ -162,6 +162,12 @@ def main():
     memo_client = MemoClient("shanghai2026", secret_key)
     memo_client.fetch()
 
+    st.set_page_config(
+        page_title="Shanghai-2026",
+        page_icon=":money_with_wings:",
+        layout="centered",
+    )
+
     with st.container(border=True):
         ty = st.pills(
             label="種別",
