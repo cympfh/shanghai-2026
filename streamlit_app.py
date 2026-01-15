@@ -2,6 +2,7 @@ import os
 from collections import defaultdict
 from enum import Enum
 
+import qrcode
 import requests
 import streamlit as st
 
@@ -222,6 +223,22 @@ def main():
                 st.markdown(f"**{memo.note}**")
     if history_exsists is False:
         st.info("履歴がありません")
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data("http://s.cympfh.cc/shanghai/")
+    qr.make(fit=True)
+    qr.make_image(fill_color="black", back_color="white").save("qrcode.png")
+    _left, mid, _right = st.columns(3)
+    with mid:
+        st.image(
+            "qrcode.png",
+            use_container_width=False,
+        )
 
 
 if __name__ == "__main__":
