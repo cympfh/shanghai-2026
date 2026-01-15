@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from enum import Enum
 
@@ -95,7 +96,8 @@ class MemoClient:
 
 
 def main():
-    memo_client = MemoClient("shanghai2026", "prod")
+    secret_key = os.environ.get("SHANGHAI_SECRET_KEY", "prod")
+    memo_client = MemoClient("shanghai2026", secret_key)
     memo_client.fetch()
 
     with st.container(border=True):
