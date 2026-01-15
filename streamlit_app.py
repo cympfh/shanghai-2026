@@ -7,6 +7,17 @@ import requests
 import streamlit as st
 
 
+class Datetime:
+    def __init__(self, raw_str: str):
+        self.raw_str = raw_str  # ISO 8601 format (UTC)
+
+    def show(self) -> str:
+        """
+        Show in YYYY-MM-DD HH:MM format
+        """
+        return self.raw_str.replace("T", " ")[:16]
+
+
 class MemoType(Enum):
     Payment = "Payment"
     Cancel = "Cancel"
@@ -72,7 +83,7 @@ class Memo:
 
 
 class MemoClient:
-    data: list[Memo]
+    data: list[tuple[int, Memo, Datetime]]  # (id, Memo, timestamp)
     url: str
     canceld_ids: set[int]
 
@@ -84,8 +95,12 @@ class MemoClient:
 
     def fetch(self):
         items = requests.get(self.url).json()
-        self.data = [Memo.from_dict(item["data"]) for item in items]
-        for memo in self.data:
+        self.data = [
+            (id, Memo.from_dict(item["data"]), Datetime(item["timestamp"]))
+            for id, item in enumerate(items)
+        ]
+        self.canceld_ids = set()
+        for _, memo, _ in self.data:
             if memo.memo_type == MemoType.Cancel and memo.cancel_id is not None:
                 self.canceld_ids.add(memo.cancel_id)
 
@@ -94,6 +109,12 @@ class MemoClient:
 
     def is_canceled(self, memo_id: int) -> bool:
         return memo_id in self.canceld_ids
+
+    def __iter__(self):
+        """Remove canceled memos"""
+        for i, memo, timestamp in self.data:
+            if not self.is_canceled(i):
+                yield i, memo, timestamp
 
 
 def main():
@@ -165,11 +186,10 @@ def main():
                     memo_client.post(memo)
                     st.rerun()
 
+    # Summary
     paytotal = defaultdict(float)
     debt = defaultdict(float)
-    for i, memo in reversed(list(enumerate(memo_client.data))):
-        if memo_client.is_canceled(i):
-            continue
+    for i, memo, timestamp in reversed(list(memo_client)):
         if memo.memo_type == MemoType.Payment:
             paytotal[memo.from_account] += memo.amount if memo.amount else 0
             accs = [acc.strip() for acc in memo.to_account.split(",")]
@@ -195,33 +215,29 @@ def main():
             else:
                 st.warning(f"枚方は神楽に対して {-debt_diff} 元の債権があります。")
 
+    # Bill history
     st.subheader("履歴")
-    history_exsists = False
-    for i, memo in reversed(list(enumerate(memo_client.data))):
-        if memo_client.is_canceled(i):
-            continue
-        history_exsists = True
+    history = list(memo_client)
+    for i, memo, timestamp in reversed(history):
         if memo.memo_type == MemoType.Payment:
-            a, b, c, d, e = st.columns([1, 2, 3, 3, 3])
-            with a:
-                st.badge(f"ID: {i}", color="blue")
-            with b:
-                st.badge("支払", icon=":material/check:", color="green")
-            with c:
-                st.markdown(f"**{memo.from_account}** → **{memo.to_account}**")
-            with d:
-                st.markdown(f"**{memo.amount} 元**")
-            with e:
-                st.markdown(f"備考: {memo.note}" if memo.note else "備考: -")
-        if memo.memo_type == MemoType.Note:
-            a, b, c = st.columns([1, 2, 9])
-            with a:
-                st.badge(f"ID: {i}", color="blue")
-            with b:
-                st.badge("メモ", icon=":material/note:", color="orange")
-            with c:
-                st.markdown(f"**{memo.note}**")
-    if history_exsists is False:
+            with st.container(border=True):
+                st.markdown(
+                    f":blue-badge[ID: {i}] :green-badge[:material/check: 支払] :gray-badge[:material/event_available: {timestamp.show()}]"
+                )
+                st.metric(
+                    label=f"{memo.from_account} → {memo.to_account}",
+                    value=f"{memo.amount} 元",
+                )
+                if memo.note:
+                    st.info(f"Note: {memo.note}")
+        if memo.memo_type == MemoType.Note and memo.note:
+            with st.container(border=True):
+                st.markdown(
+                    f":blue-badge[ID: {i}] :orange-badge[:material/note: Note] :gray-badge[:material/event_available: {timestamp.show()}]"
+                )
+                st.info(f"Note: {memo.note}")
+
+    if len(history) == 0:
         st.info("履歴がありません")
 
     qr = qrcode.QRCode(
